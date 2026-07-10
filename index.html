@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>List To Do V6</title>
+    <title>List To Do V7</title>
     <style>
         body {
             font-family: 'Times New Roman', Times, serif;
@@ -15,7 +15,7 @@
         }
         .container {
             width: 100%;
-            max-width: 900px;
+            max-width: 950px;
             background: #ffffff;
             padding: 35px;
             border-radius: 10px;
@@ -48,10 +48,18 @@
             border-bottom: 1px solid #e9ecef;
             vertical-align: middle;
         }
+        .col-drag { width: 5%; text-align: center; cursor: grab; color: #aaa; font-size: 20px; user-select: none; }
         .col-text { width: 45%; }
         .col-check { width: 13%; text-align: center; }
-        .col-action { width: 10%; text-align: center; }
+        .col-action { width: 11%; text-align: center; }
         
+        /* Hiệu ứng khi đang kéo */
+        tr.dragging {
+            opacity: 0.5;
+            background-color: #e7f5ff;
+            border: 2px dashed #1c7ed6;
+        }
+
         input[type="checkbox"] {
             width: 19px;
             height: 19px;
@@ -106,12 +114,12 @@
 <body>
 
 <div class="container">
-    <h1>LIST TO EDIT</h1>
+    <h1>LIST TO DO</h1>
     
     <table class="todo-table">
         <thead>
             <tr>
-                <th>Nội dung công việc cần làm</th>
+                <th style="width: 5%;"></th> <th>Nội dung công việc cần làm</th>
                 <th style="text-align: center;">SHORT</th>
                 <th style="text-align: center;">LONG</th>
                 <th style="text-align: center;">Hoàn thành</th>
@@ -132,12 +140,16 @@
     // Khôi phục dữ liệu khi vừa mở trang
     document.addEventListener("DOMContentLoaded", function() {
         loadData();
+        initDragAndDrop();
     });
 
-    // Tạo cấu trúc một hàng với cột Hoàn thành nằm sau cột SHORT và LONG
+    // Tạo cấu trúc một hàng có thuộc tính kéo thả (draggable="true")
     function createRowHtml(text = '', done = false, short = false, long = false) {
         const tr = document.createElement('tr');
+        tr.setAttribute('draggable', 'true'); // Cho phép hàng này có thể kéo được
+        
         tr.innerHTML = `
+            <td class="col-drag" title="Nhấp giữ để kéo thả thay đổi vị trí">☰</td>
             <td class="col-text">
                 <input type="text" value="${text}" placeholder="Nhập nội dung công việc tại đây..." oninput="saveData()">
             </td>
@@ -154,6 +166,9 @@
                 <button class="btn-delete" onclick="deleteRow(this)">Xóa</button>
             </td>
         `;
+        
+        // Gán sự kiện kéo thả cho hàng mới tạo
+        addDragEvents(tr);
         return tr;
     }
 
@@ -181,7 +196,10 @@
         const data = [];
         
         rows.forEach(row => {
-            const text = row.querySelector('input[type="text"]').value;
+            const textInput = row.querySelector('input[type="text"]');
+            if (!textInput) return; // Tránh lưu các hàng trung gian lỗi
+            
+            const text = textInput.value;
             const short = row.querySelector('.chk-short').checked;
             const long = row.querySelector('.chk-long').checked;
             const done = row.querySelector('.chk-done').checked;
@@ -211,12 +229,61 @@
         addNewRowAndSave();
     }
 
-    // Xuất file Word với thứ tự cột mới
+    // --- LOGIC KÉO THẢ (DRAG AND DROP) ---
+    let dragSrcEl = null;
+
+    function addDragEvents(row) {
+        row.addEventListener('dragstart', function(e) {
+            dragSrcEl = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        row.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            saveData(); // Sau khi thả, lưu lại thứ tự mới vào bộ nhớ ngay lập tức
+        });
+    }
+
+    function initDragAndDrop() {
+        const tbody = document.getElementById('todo-body');
+
+        tbody.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            const draggingRow = document.querySelector('.dragging');
+            if (!draggingRow) return;
+
+            // Tìm vị trí hàng chuột đang lướt qua để chèn vào trước hoặc sau hàng đó
+            const afterElement = getDragAfterElement(tbody, e.clientY);
+            if (afterElement == null) {
+                tbody.appendChild(draggingRow);
+            } else {
+                tbody.insertBefore(draggingRow, afterElement);
+            }
+        });
+    }
+
+    // Xác định hàng nào nằm ngay dưới vị trí con trỏ chuột khi đang kéo
+    function getDragAfterElement(tbody, y) {
+        const draggableElements = [...tbody.querySelectorAll('tr:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // Xuất file Word (Không bao gồm cột kéo thả và cột xóa)
     function exportToDocx() {
         const rows = document.querySelectorAll('#todo-body tr');
         let tableRowsHtml = "";
 
-        // Tiêu đề bảng trong Word (Đã dời Hoàn thành ra sau cùng)
+        // Tiêu đề bảng trong Word
         tableRowsHtml += `
             <tr style="background-color:#f2f2f2;">
                 <td style="border:1px solid #000000; padding:8px; width:55%; font-weight:bold; text-align:center;">Nội dung công việc</td>
@@ -227,7 +294,10 @@
         `;
 
         rows.forEach(row => {
-            const textValue = row.querySelector('input[type="text"]').value.trim();
+            const textInput = row.querySelector('input[type="text"]');
+            if (!textInput) return;
+            
+            const textValue = textInput.value.trim();
             const isShort = row.querySelector('.chk-short').checked;
             const isLong = row.querySelector('.chk-long').checked;
             const isDone = row.querySelector('.chk-done').checked;
@@ -238,7 +308,6 @@
             const boxLong = isLong ? "&#9746;" : "&#9744;";
             const boxDone = isDone ? "&#9746;" : "&#9744;";
 
-            // Tạo các hàng dữ liệu Word đồng bộ thứ tự cột mới
             tableRowsHtml += `
                 <tr>
                     <td style="border:1px solid #000000; padding:8px; text-align:left;">${textValue}</td>
@@ -249,7 +318,6 @@
             `;
         });
 
-        // Cấu hình file Word (Font Times New Roman, Cỡ chữ 18)
         const contentHtml = `
             <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
             <head>
@@ -276,7 +344,6 @@
                 <p class="MsoNormal" align="center" style="text-align:center; margin-bottom:24pt;">
                     <b style="font-size:24.0pt;">LIST TO DO</b>
                 </p>
-                
                 <table>
                     ${tableRowsHtml}
                 </table>
