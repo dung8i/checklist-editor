@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>List To Do V6</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background-color: #f7f9fc;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: #ffffff;
+            padding: 35px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        h1 {
+            text-align: center;
+            color: #222;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .todo-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        .todo-table th {
+            background-color: #f1f3f5;
+            border-bottom: 2px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+            font-size: 16px;
+            color: #495057;
+        }
+        .todo-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+        .col-text { width: 45%; }
+        .col-check { width: 13%; text-align: center; }
+        .col-action { width: 10%; text-align: center; }
+        
+        input[type="checkbox"] {
+            width: 19px;
+            height: 19px;
+            cursor: pointer;
+        }
+        input[type="text"] {
+            width: 96%;
+            padding: 10px 12px;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 16px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: #1c7ed6;
+        }
+        .btn-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .btn {
+            font-family: 'Times New Roman', Times, serif;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn-add {
+            background-color: #2b8a3e;
+            color: white;
+        }
+        .btn-print {
+            background-color: #1c7ed6;
+            color: white;
+        }
+        .btn-delete {
+            background-color: #fa5252;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>LIST TO EDIT</h1>
+    
+    <table class="todo-table">
+        <thead>
+            <tr>
+                <th>Nội dung công việc cần làm</th>
+                <th style="text-align: center;">SHORT</th>
+                <th style="text-align: center;">LONG</th>
+                <th style="text-align: center;">Hoàn thành</th>
+                <th style="text-align: center;">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody id="todo-body">
+            </tbody>
+    </table>
+
+    <div class="btn-group">
+        <button class="btn btn-add" onclick="addNewRowAndSave()">+ Thêm hàng mới</button>
+        <button class="btn btn-print" onclick="exportToDocx()">In ra file Word (.docx)</button>
+    </div>
+</div>
+
+<script>
+    // Khôi phục dữ liệu khi vừa mở trang
+    document.addEventListener("DOMContentLoaded", function() {
+        loadData();
+    });
+
+    // Tạo cấu trúc một hàng với cột Hoàn thành nằm sau cột SHORT và LONG
+    function createRowHtml(text = '', done = false, short = false, long = false) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="col-text">
+                <input type="text" value="${text}" placeholder="Nhập nội dung công việc tại đây..." oninput="saveData()">
+            </td>
+            <td class="col-check">
+                <input type="checkbox" class="chk-short" ${short ? 'checked' : ''} onchange="saveData()">
+            </td>
+            <td class="col-check">
+                <input type="checkbox" class="chk-long" ${long ? 'checked' : ''} onchange="saveData()">
+            </td>
+            <td class="col-check">
+                <input type="checkbox" class="chk-done" ${done ? 'checked' : ''} onchange="saveData()">
+            </td>
+            <td class="col-action">
+                <button class="btn-delete" onclick="deleteRow(this)">Xóa</button>
+            </td>
+        `;
+        return tr;
+    }
+
+    function addNewRowAndSave() {
+        const tbody = document.getElementById('todo-body');
+        const tr = createRowHtml();
+        tbody.appendChild(tr);
+        saveData();
+    }
+
+    function deleteRow(button) {
+        const row = button.parentElement.parentElement;
+        row.remove();
+        saveData();
+        
+        const tbody = document.getElementById('todo-body');
+        if (tbody.children.length === 0) {
+            addNewRowAndSave();
+        }
+    }
+
+    // Tự động lưu dữ liệu vào LocalStorage
+    function saveData() {
+        const rows = document.querySelectorAll('#todo-body tr');
+        const data = [];
+        
+        rows.forEach(row => {
+            const text = row.querySelector('input[type="text"]').value;
+            const short = row.querySelector('.chk-short').checked;
+            const long = row.querySelector('.chk-long').checked;
+            const done = row.querySelector('.chk-done').checked;
+            
+            data.push({ text, done, short, long });
+        });
+        
+        localStorage.setItem('todo_list_data', JSON.stringify(data));
+    }
+
+    // Tải dữ liệu cũ lên giao diện
+    function loadData() {
+        const tbody = document.getElementById('todo-body');
+        tbody.innerHTML = "";
+        
+        const rawData = localStorage.getItem('todo_list_data');
+        if (rawData) {
+            const data = JSON.parse(rawData);
+            if (data.length > 0) {
+                data.forEach(item => {
+                    const tr = createRowHtml(item.text, item.done, item.short, item.long);
+                    tbody.appendChild(tr);
+                });
+                return;
+            }
+        }
+        addNewRowAndSave();
+    }
+
+    // Xuất file Word với thứ tự cột mới
+    function exportToDocx() {
+        const rows = document.querySelectorAll('#todo-body tr');
+        let tableRowsHtml = "";
+
+        // Tiêu đề bảng trong Word (Đã dời Hoàn thành ra sau cùng)
+        tableRowsHtml += `
+            <tr style="background-color:#f2f2f2;">
+                <td style="border:1px solid #000000; padding:8px; width:55%; font-weight:bold; text-align:center;">Nội dung công việc</td>
+                <td style="border:1px solid #000000; padding:8px; width:15%; font-weight:bold; text-align:center;">SHORT</td>
+                <td style="border:1px solid #000000; padding:8px; width:15%; font-weight:bold; text-align:center;">LONG</td>
+                <td style="border:1px solid #000000; padding:8px; width:15%; font-weight:bold; text-align:center;">Hoàn thành</td>
+            </tr>
+        `;
+
+        rows.forEach(row => {
+            const textValue = row.querySelector('input[type="text"]').value.trim();
+            const isShort = row.querySelector('.chk-short').checked;
+            const isLong = row.querySelector('.chk-long').checked;
+            const isDone = row.querySelector('.chk-done').checked;
+            
+            if (!textValue && !isDone && !isShort && !isLong) return;
+
+            const boxShort = isShort ? "&#9746;" : "&#9744;";
+            const boxLong = isLong ? "&#9746;" : "&#9744;";
+            const boxDone = isDone ? "&#9746;" : "&#9744;";
+
+            // Tạo các hàng dữ liệu Word đồng bộ thứ tự cột mới
+            tableRowsHtml += `
+                <tr>
+                    <td style="border:1px solid #000000; padding:8px; text-align:left;">${textValue}</td>
+                    <td style="border:1px solid #000000; padding:8px; text-align:center; font-weight:bold;">${boxShort}</td>
+                    <td style="border:1px solid #000000; padding:8px; text-align:center; font-weight:bold;">${boxLong}</td>
+                    <td style="border:1px solid #000000; padding:8px; text-align:center; font-weight:bold;">${boxDone}</td>
+                </tr>
+            `;
+        });
+
+        // Cấu hình file Word (Font Times New Roman, Cỡ chữ 18)
+        const contentHtml = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head>
+                <title>List To Do</title>
+                <style>
+                    body {
+                        font-family: 'Times New Roman', Times, serif;
+                        font-size: 18.0pt;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-family: 'Times New Roman', Times, serif;
+                        font-size: 18.0pt;
+                    }
+                    p.MsoNormal {
+                        margin: 0in 0in 0.0001pt;
+                        font-family: 'Times New Roman', Times, serif;
+                        font-size: 18.0pt;
+                    }
+                </style>
+            </head>
+            <body>
+                <p class="MsoNormal" align="center" style="text-align:center; margin-bottom:24pt;">
+                    <b style="font-size:24.0pt;">LIST TO DO</b>
+                </p>
+                
+                <table>
+                    ${tableRowsHtml}
+                </table>
+            </body>
+            </html>
+        `;
+
+        const blob = new Blob(['\ufeff' + contentHtml], {
+            type: 'application/msword'
+        });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'LIST_TO_DO.doc'; 
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>
